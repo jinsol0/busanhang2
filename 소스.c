@@ -33,16 +33,12 @@
 #define Madong 1
 #define Zombie 2
 
-
 int train[LEN_MAX];
-int loca[3] = { 6, 2, 3 }; // C, M, Z 순서 (로 바꿔놓기)
+int loca[3] = { 6, 2, 3 }; // C, M, Z 순서
 int prev_loca[3];
 int aggro[2] = { 1,1 }; // C, M 순서
 int prev_aggro[2];
 int M_stm[2]; // 이전 stamina, 현재 stamina
-
-// ㅇㄴ... 나중에 loca 랑 aggro 싹 확인해서 prev 써야할걸 안쓴부분은 변경하기... 
-// 하 솔직히 지금 배열 저 ㅈㄹ 해놓은것도 비효율적인 것같은데 일단 그건 나중에 변경
 
 void intro();
 int scan_len();
@@ -61,10 +57,8 @@ bool check_Z_act();
 bool check_M_act(int);
 void act_rest();
 void act_provoke();
-void act_pull(int);
-
-// 게임이 종료되지 않는 중대한 문제 발생!
-
+bool act_pull(int);
+bool check_M_die();
 
 int main(void) {
 	srand((unsigned int)time(NULL));
@@ -88,7 +82,7 @@ int main(void) {
 		// 이동 페이즈
 		Cit_move(p);
 
-		if (round % 2 == 1) Zom_move(act_pull); // 추후 마동석 '붙들기' 로 인한 옵션 추가
+		if (round % 2 == 1) Zom_move(act_pull);
 
 		set_train(t_len, round);
 		print_train(t_len);
@@ -110,8 +104,9 @@ int main(void) {
 		exit_game = check_Z_act();
 		if (exit_game == true) break;
 
-		act_pull = check_M_act(p);
+		exit_game = check_M_die();
 		if (exit_game == true) break;
+		act_pull = check_M_act(p);
 
 		round++;
 	}
@@ -221,10 +216,10 @@ void Cit_move(int per) {
 
 	if (r <= 100 - per) {
 		loca[Citizen]++;
-		if (aggro[0] < AGGRO_MAX) aggro[0]++;
+		if (aggro[Citizen] < AGGRO_MAX) aggro[Citizen]++;
 	}
 	else {
-		if (aggro[0] > AGGRO_MIN) aggro[0]--;
+		if (aggro[Citizen] > AGGRO_MIN) aggro[Citizen]--;
 	}
 }
 
@@ -232,14 +227,14 @@ void Zom_move(bool pull) {
 	prev_loca[Zombie] = loca[Zombie];
 
 	if (pull == false) {
-		if (aggro[Madong] >= aggro[Madong]) {
-			if (loca[Citizen] - loca[Zombie] != 1)
+		if (aggro[Citizen] >= aggro[Madong]) {
+			if ((loca[Citizen] - loca[Zombie]) != 1) 
 			{
 				loca[Zombie]++; // 좀비 왼쪽 이동
 			}
 		}
 		else {
-			if (loca[Zombie] - loca[Madong] != 1)
+			if ((loca[Zombie] - loca[Madong]) != 1) 
 			{
 				loca[Zombie]++; // 좀비 오른쪽 이동
 			}
@@ -294,14 +289,14 @@ void scan_M_move() {
 		{
 			printf("madongseok move(0:stay)>> ");
 			scanf_s("%d", &M_move);
-		} while (!(M_move == MOVE_STAY));
+		} while (M_move != MOVE_STAY);
 	}
 	else {
 		do
 		{
 			printf("madongseok move(0:stay, 1:left)>> ");
 			scanf_s("%d", &M_move);
-		} while (!(M_move == MOVE_STAY || M_move == MOVE_LEFT));
+		} while (M_move < MOVE_STAY || M_move > MOVE_LEFT);
 	}
 
 	switch (M_move)
@@ -319,21 +314,21 @@ void scan_M_move() {
 void print_M_status(int len) {
 	if (prev_loca[Madong] == loca[Madong]) {
 		if (prev_aggro[Madong] == aggro[Madong]) {
-			printf("madongseok: stay %d(aggro: %d, stamina: %d)\n", \
+			printf("madongseok: stay %d(aggro: %d, stamina: %d)\n\n", \
 				len - loca[Madong], aggro[Madong], M_stm[1]);
 		}
 		else {
-			printf("madongseok: stay %d(aggro: %d -> %d, stamina: %d)\n", \
+			printf("madongseok: stay %d(aggro: %d -> %d, stamina: %d)\n\n", \
 				len - loca[Madong], prev_aggro[Madong], aggro[Madong], M_stm[1]);
 		}
 	}
 	else {
 		if (prev_aggro[Madong] == aggro[Madong]) {
-			printf("madongseok: %d -> %d (aggro: %d, stamina: %d)\n", \
+			printf("madongseok: %d -> %d (aggro: %d, stamina: %d)\n\n", \
 				len - prev_loca[Madong], len - loca[Madong], aggro[Madong], M_stm[1]);
 		}
 		else {
-			printf("madongseok: %d -> %d (aggro: %d -> %d, stamina: %d)\n", \
+			printf("madongseok: %d -> %d (aggro: %d -> %d, stamina: %d)\n\n", \
 				len - prev_loca[Madong], len - loca[Madong], prev_aggro[Madong], aggro[Madong], M_stm[1]);
 		}
 	}
@@ -345,6 +340,9 @@ bool check_C_act(int len) {
 		printf("YOU WIN!\n");
 		return true;
 	}
+	else {
+		printf("citizen does nothing.\n");
+	}
 
 	return false;
 }
@@ -352,7 +350,7 @@ bool check_C_act(int len) {
 bool check_Z_act() {
 	M_stm[0] = M_stm[1];
 	int atk_target = ATK_NONE;
-	if (loca[Citizen] - loca[Zombie] == 0 && loca[Zombie] - loca[Madong] == 0) {
+	if (loca[Citizen] - loca[Zombie] == 1 && loca[Zombie] - loca[Madong] == 1) { // 둘다 인접한 경우
 		if (aggro[Citizen] > aggro[Madong]) {
 			atk_target = ATK_CITIZEN;
 		}
@@ -360,8 +358,8 @@ bool check_Z_act() {
 			atk_target = ATK_DONGSEOK;
 		}
 	}
-	else if (loca[Citizen] - loca[Zombie] == 1) atk_target = ATK_CITIZEN;
-	else if (loca[Zombie] - loca[Madong] == 1) atk_target = ATK_DONGSEOK;
+	else if (loca[Citizen] - loca[Zombie] == 1) atk_target = ATK_CITIZEN; // 시민과 인접
+	else if (loca[Zombie] - loca[Madong] == 1) atk_target = ATK_DONGSEOK; // 마동석과 인접
 
 	switch (atk_target)
 	{
@@ -372,18 +370,19 @@ bool check_Z_act() {
 		printf("GAME OVER! citizen dead...\n");
 		return true;
 	case ATK_DONGSEOK:
-		M_stm[1]--;
-		printf("zombie attacked madongseok (aggro: %d vs. %d, madongseok stamina: %d -> %d)\n", \
-			aggro[Citizen], aggro[Madong], M_stm[0], M_stm[1]);
-		if (M_stm[1] == 0) {
-			printf("GAME OVER! madongseok dead...\n");
-			return true;
+		M_stm[0] = M_stm[1];
+		if (M_stm[1] > STM_MIN) {
+			M_stm[1]--;
+			printf("zombie attacked madongseok (aggro: %d vs. %d, madongseok stamina: %d -> %d)\n", \
+				aggro[Citizen], aggro[Madong], M_stm[0], M_stm[1]);
+			return false;
 		}
-		return false;
 	}
+
+	return false;
 }
 
-bool check_M_act(int per) { // 얘도 좀 그런게 2개의 행동을 같이하고 있음(프린트&판별)
+bool check_M_act(int per) { 
 	int act;
 
 	if (loca[Zombie] - loca[Madong] == 1) { // 좀비와 인접한 경우
@@ -426,8 +425,9 @@ bool check_M_act(int per) { // 얘도 좀 그런게 2개의 행동을 같이하고 있음(프린트&
 }
 
 void act_rest() {
-	M_stm[1]++;
+	M_stm[0] = M_stm[1];
 	prev_aggro[Madong] = aggro[Madong];
+	if(M_stm[1] <AGGRO_MAX) M_stm[1]++;
 	if (aggro[Madong] > AGGRO_MIN) aggro[Madong]--;
 	printf("\nmadongseok rests...\n");
 	printf("madongseok: %d (aggro: %d -> %d, stamina: %d -> %d)\n", \
@@ -439,32 +439,42 @@ void act_provoke() {
 	aggro[Madong] = AGGRO_MAX;
 	printf("\nmadongseok provoked zombie...\n");
 	printf("madongseok: %d (aggro: %d -> %d, stamina: %d)\n", \
-		loca[Madong], prev_aggro[Madong], aggro[Madong], M_stm[1]); // 여기 어그로 6으로 출력된다. 해결해
+		loca[Madong], prev_aggro[Madong], aggro[Madong], M_stm[1]); 
 }
 
-void act_pull(int per) {
+bool act_pull(int per) {
 	int r;
+	M_stm[0] = M_stm[1];
 	prev_aggro[Madong] = aggro[Madong];
-	M_stm[1]--;
-	if (aggro[Madong] + 2 <= AGGRO_MAX - 2) {
+	if(M_stm[1]>STM_MIN) M_stm[1]--;
+	if (aggro[Madong] <= AGGRO_MAX - 2) {
 		aggro[Madong] += 2;
 	}
-	else if (aggro[Madong] + 1 == AGGRO_MAX - 1) {
+	else if (aggro[Madong] == AGGRO_MAX - 1) {
 		aggro[Madong]++;
 	}
 
 	r = rand() % 101;
 	if (r <= 100 - per) {
 		printf("\nmadongseok pulled zombie... Next turn, it can't move\n");
+		printf("madongseok: %d (aggro: %d -> %d, stamina: %d -> %d)\n", \
+			loca[Madong], prev_aggro[Madong], aggro[Madong], M_stm[0], M_stm[1]);
+		return true;
 	}
 	else {
 		printf("\nmadongseok failed to pull zombie\n");
+		printf("madongseok: %d (aggro: %d -> %d, stamina: %d -> %d)\n", \
+			loca[Madong], prev_aggro[Madong], aggro[Madong], M_stm[0], M_stm[1]);
+		return false;
 	}
-	printf("madongseok: %d (aggro: %d -> %d, stamina: %d -> %d)\n", \
-		loca[Madong], prev_aggro[Madong], aggro[Madong], M_stm[0], M_stm[1]);
-	if (M_stm[1] == 0) return ?; // 여기서 게임 종료 해줘야함
 }
 
-// pull 성공 유무 판별 변수 & 게임 종료 여부 판별 변수.. 전역변수 쓰고싶다..
-// 하 거의 다만든줄 알았는데 생각보다 오류도 많고 가독성&일관성이 너무 안좋아서 
-// 고칠 부분이 산더미네... 제일 큰 문제가 판별 변수 & 배열 선언 방식(너무 비효율적)
+bool check_M_die() {
+	if (M_stm[1] == 0) { // 마동석 사망 판별
+		printf("GAME OVER! madongseok dead...\n");
+		return true;
+	}
+	else {
+		return false;
+	}
+}
