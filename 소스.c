@@ -301,11 +301,11 @@ void scan_M_move() {
 
 	switch (M_move)
 	{
-	case 1:
+	case MOVE_LEFT:
 		loca[Madong]++;
 		if (aggro[Madong] < AGGRO_MAX) aggro[Madong]++;
 		break;
-	case 0:
+	case MOVE_STAY:
 		if (aggro[Madong] > AGGRO_MIN) aggro[Madong]--;
 		break;
 	}
